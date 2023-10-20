@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Simple vacA polymorphism genotype finder
+Accepts both single sequence from launch arguments and FASTA files
+Returns a string of found genotype for each sequence
+
+Usage: vaca.py [-h] (-s SEQ | -f FILE) [--sep SEP]
+options:
+    -h, --help            show this help message and exit
+    -s SEQ, --seq SEQ     Single vacA sequence as argument
+    -f FILE, --file FILE  FASTA file containing one or more vacA sequences
+    --sep SEP             Separator for result output. Using ',' is great for CSV files
+
+author:     Léo Gillet <leo@leogillet.com> (CHU de Bordeaux)
+date:       october 2023
+"""
+import argparse
+
+from Bio import SeqIO
+import pyalign
+
+s_sequences = {
+    "S1": "".join(
+        (
+            "ATGGAAATACAACAAACACACCGCAAAATCAATCGCCCTCTGGTTTCTCTCGCTTTAGTAGGAGCATTAG",
+            "TCAGCATCACACCGCAACAAAGTCATGCCGCCTTTTTCACAACCGTGATCATTCCAGCCATTGTTGGGGG",
+            "TATCGCTACAGGCACCGCTGTAGGAACGGTCTCAGGGCTTCTTGGCTGGGGGCTCAAACAAGCCGAAGAA",
+            "GCCAATAAAACCCCGGATAAACCCGAAAAAGTTTGGCGCATTCAAGCA",
+        )
+    ),
+    "S2": "".join(
+        (
+            "ATGGAAATACAACAAACACACCGCAAAATCAATCGCCCTATTATCTCTCTCGCTTTAGTGGGGGTGTTAA",
+            "TGGGCACCGAACTAGGGGCTAATACTCCAAATGATCCCATACACAGCGAGAGTCGTGCTTTTTTTACAAC",
+            "CGTGATCATTCCAGCCATTGTTGGAGGTATCGCTACAGGCGCTGCTGTAGGAACGGTCTCAGGGCTTCTT",
+            "AGCTGGGGGCTCAAACAAGCCGAACAAGCCAATAAAGCCCCAGACAAACCCGATAAAGTTTGGCGCATTC",
+            "AAGCA",
+        )
+    ),
+}
+
+i_sequences = {
+    "I1": "".join(
+        (
+            "AATGCCGCTAGGCATTATTGGGTCAAAGGCGGGCAATGGAACAAGCTTGAAGTGGATATGAAAGACGCTG",
+            "TAGGGACTTATAAGCTCTCAGGGCTAAGAAACTACACCGGTGGGGATTTAGATGTCAATATGCAAAAAGC",
+            "CACTTTACGCTTGGGTCAATTCAACGGCAATTCTTTCACAAGCTTCAAGGATAGCGCCGATCGCACCACG",
+            "AGAGTGGATTTCAACGCTAAAAATATCTTAATTGATAATTTTTTAGAAATCAATAATCGTGTGGGTTCTG",
+            "GAGCCGGGAGGAAAGCTAGCTCTACGGTTTTAACTTTGCAAGCTTCAGAAGGGATCACTAGCGATAAAAA",
+            "CGCAGAAATTTCTCTTTATGATGGCGCCACGCTCAATTTGGCTTCAAACAGCGTTAAATTAATGGGTAAT",
+            "GTGTGGATGGGCCGT",
+        )
+    ),
+    "I2": "".join(
+        (
+            "AATGCCGCTAGGCATTATTGGGTCAAAGACGGGCAGTGGAACAAGCTTGAAGTGGATATGCAAAACGCTG",
+            "TAGGGACTTATAACCTTTCAGGCCTTATCAACTTTACCGGTGGGGATTTAGACGTCAATATGCAAAAAGC",
+            "CACTTTGCGCTTGGGCCAATTCAATGGCAATTCTTTCACAAGCTTTAAGGATAGTGCTGATCGCACCACG",
+            "AGAGTGAATTTTAACGCTAAAAATATCTTAATTGATAATTTTGTAGAAATCAACAATCGCGTGGGTTCTG",
+            "GAGCCGGCAGGAAAGCCAGCTCTACGGTTTTAACTTTGCAAGCTTCAGAAAAAATCACGAGCCGTGAAAA",
+            "CGCAGAAATTTCTCTTTATGATGGCGCCACGCTTAATTTGGTTTCAAGCTCAAATCAGAGCGTTGATCTC",
+            "TATGGTAAGGTGTGGATGGGCCGT",
+        )
+    ),
+}
+
+m_sequences = {
+    "M1": "".join(
+        (
+            "GCTCATTTGCATATCGGCAAAGGCGGTGTCAATCTGTCCAATCAAGCGAGCGGGCGCACCCTTTTAGTGG",
+            "AAAATCTAACCGGGAATATCACCGTTGATGGGGCTTTAATGGTGAATAATCAAGTGGGCGGTTATGCTTT",
+            "GGCAGGCTCAAGCGCGAATTTTGAGTTTAAGGCTGGTGCGGATACCAAAAACGGCACAGTTACTTTTAAT",
+            "AACGATATTAGTTTGGGAAGATTTGTGAATTTAAAAGTGGATGCCCATACAGCTCATTTTAAAGGTATTG",
+            "ATACTGGTAATGGTGGTTTCAACACCTTAGATTTCAGTGGCGTTACAAACAAAGTCAATATCAACAAGCT",
+            "CATTACAGCTTCCACTAATGTGGCCATTAAAAACTTCAACATTAATGAATTGGTGGTTAAAACCAATGGT",
+            "ATAAGCGTGGGGGAATACACTCATTTTAGCGAAGATATAGGCAATCAATCGCGCATCAATACCGTGCGTT",
+            "TGGAAACTGGCACTAGGTCAATCTATTCTGGCGGTGTAAAATTTAAAAGCGGTGAAAAACTGGTTATCAA",
+            "TGATTTTTACTACGCCCCTTGGAATTATTTTGACGCTAGAAATATTAAAAATGTTGAAATCACCAATAAA",
+            "CTTGCTTTTGGACCTCAAGGAAGTCCTTGGGGCACGGCACAACTTATGTTTAATAATCTAACCCTAGGTC",
+            "AAAATGCGGTCATGGATTATAGCCAATTTTCAAATTTAACCATTCAAGGGGATTTCACCAACAATCAAGG",
+            "CACTATCAATTATTTGGTCCGAGGCGGGCAAGTAGCAACCTTGAATGTAGGCAATGCAGCAGCTATGCTC",
+            "TTTAATAATAATGTGGATAGCGCGACTGGGTTTTACCAACCGCTCATGAAGATTAACAGTGCTCAAGATC",
+            "TCATTAAAAATAAAGAACATGTCTTATTGAAAGCGAAAATCATCGGTTATGGCAATGTTTCTGCGGGCAC",
+            "TAACAGCATTAGTAATGTTAATCTAATAGAGCAATTCAAAGAGCGTCTAGCCCTTTATAACAACAATAAC",
+            "CGCATGGATATTTGTGTGGTGCGAAATACTGATGATATTAAAGCATGCGGGACGGCTATCGGCGATCAAG",
+            "CCATGGTGAATAACCCTGACAATTACAAGTATCTTATCGGTAAGGCATGGAAAAATATAGGGATCAGCAA",
+            "AACGGCTAACGGCTCTAAAATTTCGGTGCATTATTTAGGCAATTCTACGCCTACTGAGAATGGTGGCAAT",
+            "ACCACAAATTTACCTACAAACGCCACTAACAAGGCGCGTTTCGCTAGCTACGCTCTCATCAAGAACGCTC",
+            "CTTTCACTCATTATAACGCTACTCCTAATTTAGTCGCTATCAATCAGCATG",
+        )
+    ),
+    "M2": "".join(
+        (
+            "GCTCATTTGCATATTGGCGAAGGCGGTGTCAATCTGTCCAATCAAGCGAGCGGGCGCTCTCTTTTAGTGG"
+            "AAAATCTAACCGGGAATATCACCGTTGAGGGGACTTTAAGAGTGAATAATCAAGTGGGCGGTGCTGCTGT",
+            "GGCAGGATCAAGCGCGAATTTTGAATTTAAGGCTGGTGAAGACACCAACAACGCCACAGCCACTTTCAAT",
+            "AACGATATCCATCTGGGAAAAGCGGTGAACTTAAGAGTGGACGCTCATACAGCTTATTTTAATGGCAATA",
+            "TTTATTTGGGAAAATCCACGAATTTAAGAGTGAATGGCCATAGCGCTCATTTTAAAAATATTGATGCCAG",
+            "TAAGAGCGATAACGGGCTAAACACTAGCGCTTTGGATTTTAGCGGCGTTACAGATAAAGTCAATATCAAC",
+            "AAGCTCACTACATCTGCCACTAATGTGAACATTAAAAACTTTGACATTAAGGAATTAGTGGTTACAACCC",
+            "GAGTTCAGAGTTTTGGGCAATACACTATTTTTGGCGAAAATATAGGCGATAAGTCTCGCATTGGTGTCGT",
+            "TAGTTTGCAAACGGGATATAGCCCGGCCTATTCTGGGGGCGTTACTTTTAAAAGCGGTAAGAAACTCGTT",
+            "ATAGATGAAATTTACCATGCCCCTTGGAATTATTTTGACGCTAGGAATGTTACCGATGTTGAAATCAACA",
+            "AGAGGATTCTTTTTGGAGCCCCAGGAAACATTGCCGGCAAAACAGGGCTTATGTTTAATAACCTAACCCT",
+            "AAACAGCAACGCAAGCATGGATTATGGTAAAGATTTAGACTTAACCATTCAAGGGCATTTCACTAACAAT",
+            "CAAGGCACGATGAATCTTTTTGTCCAAGATGGGCGTGTAGCGACCTTGAATGCAGGCCATCAAGCAAGCA",
+            "TGATATTTAATAATGTAGTGGATAGCGCGACCGGATTTTACAAACCACTCATTAAGATCAATAACGCTCA",
+            "AAACCTCACTAAAAATAAAGAACATGTTTTAGTGAAAGCGCGAAACATTGATTATAATTTAGTGGGAGTG",
+            "CAAGGCGCTAGTTATGACAATATTTCTGCAAGCAACACCAATCTGCAAGAGCAATTCAAAGAGCGCCTAG",
+            "CCCTTTATAACAACAACAACCGCATGGATATTTGTGTGGTGCGAAAAAATAATACCGATGACATTAAAGC",
+            "ATGCGGGATGGCTATCGGCAACCAATCCATGGTGAATAACCCTGAAAATTACAAGTATCTTGAAGGTAAG",
+            "GCATGGAAAAATACAGGGATCAATAAAACGGCTAACAACACCACAATCGCTGTTAATTTAGGCAACAATT",
+            "CTACGCCTACTGAGAATGGTGGCAATACCACAAATTTACCCACCAACACCACTAACAAGGTGCGTTTCGC",
+            "TAGCTACGCTCTCATAAAGAACGCTCCTTTCGCTCGTTATAGCGCTACTCCTAATTTAGTCGCTATCAAT",
+            "CAGCATG",
+        )
+    ),
+}
+
+
+def align_sequences(query, reference):
+    """Aligns query and reference vacA sequences locally using the pyalign library
+
+    Args:
+        query (str): query vacA sequence
+        reference (str): reference vacA sequence
+
+    Returns:
+        str: alignment score
+    """
+    alignment = pyalign.local_alignment(query, reference)
+    return alignment.score
+
+
+def find_genotype(vaca_seq):
+    """Aligns vacA sequence to all reference cluster sequences and determines
+    its genotype based on the best alignment score for each cluster
+
+    Args:
+        vaca_seq (str): Complete vacA gene sequence
+
+    Returns:
+        str: guessed genotype formatted as S*/I*/M*
+    """
+    # Determining S cluster
+    s_scores = {}
+    for genotype, ref_seq in s_sequences.items():
+        s_scores[genotype] = align_sequences(vaca_seq, ref_seq)
+
+    # Determining I cluster
+    i_scores = {}
+    for genotype, ref_seq in i_sequences.items():
+        i_scores[genotype] = align_sequences(vaca_seq, ref_seq)
+
+    # Determining M cluster
+    m_scores = {}
+    for genotype, ref_seq in m_sequences.items():
+        m_scores[genotype] = align_sequences(vaca_seq, ref_seq)
+
+    # Determining best match for each cluster
+    best_matches = []
+    for cluster in (s_scores, i_scores, m_scores):
+        best_match, *_ = max(cluster.items(), key=lambda x: x[1])
+        best_matches.append(best_match)
+
+    return "/".join(best_matches)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="vaca.py", description="vacA polymorphism genotype finder"
+    )
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("-s", "--seq", help="Single vacA sequence as argument")
+    input_group.add_argument(
+        "-f",
+        "--file",
+        help="FASTA file containing one or more vacA sequences",
+        type=argparse.FileType("r"),
+    )
+    parser.add_argument(
+        "--sep",
+        help="Separator for result output. Using ',' is great for CSV files. Defaults to tab",
+        default="\t",
+    )
+    args = parser.parse_args()
+    if args.file:
+        for record in SeqIO.parse(args.file, "fasta"):
+            print(f"{record.id}{args.sep}{find_genotype(str(record.seq))}")
+    if args.seq:
+        print(find_genotype(args.seq))

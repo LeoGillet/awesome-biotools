@@ -33,7 +33,9 @@ def search_motif(caga_seq, norareseg=False) -> str:
 
     Args:
         caga_seq (str): cagA sequence
-        norareseg (bool, optional): If True, rare segment codes (', '', ''') will be ignored from output. Defaults to False.
+        norareseg (bool, optional): If True, rare segment codes (', '', ''') 
+                                    will be ignored from output. 
+                                    Defaults to False.
 
     Returns:
         str: genotype of sequence
