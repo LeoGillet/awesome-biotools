@@ -1,0 +1,2 @@
+biopython~=1.81
+pyalign~=0.4.4
