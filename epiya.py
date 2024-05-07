@@ -15,11 +15,11 @@ options:
 
 
 citing:     Xue, Zhijing et al.
-            Diversity of 3' variable region of cagA gene in Helicobacter pylori strains 
+            Diversity of 3' variable region of cagA gene in Helicobacter pylori strains
                 isolated from Chinese population.
             13 Apr. 2021
             doi:10.1186/s13099-021-00419-3
-            
+
 author:     Léo Gillet <leo@leogillet.com> (CHU de Bordeaux)
 date:       october 2023
 """
@@ -28,13 +28,13 @@ import argparse
 from Bio import SeqIO
 
 
-def search_motif(caga_seq, norareseg=False) -> str:
+def search_motif(caga_seq, norareseg=False, return_list=False) -> str:
     """Scans string for any EPIYA motif, returns found genotype.
 
     Args:
         caga_seq (str): cagA sequence
-        norareseg (bool, optional): If True, rare segment codes (', '', ''') 
-                                    will be ignored from output. 
+        norareseg (bool, optional): If True, rare segment codes (', '', ''')
+                                    will be ignored from output.
                                     Defaults to False.
 
     Returns:
@@ -89,12 +89,10 @@ def search_motif(caga_seq, norareseg=False) -> str:
                     if caga_seq[i : i + 5] in motifs:
                         this_seg = seg
                         break
-            this_motif = ""
             for motif, amino_acids in epiya_4aa.items():
                 if caga_seq[i + 5 : i + 9] in amino_acids:
-                    this_motif = motif
-                    found_motifs.append(f"{this_motif}{this_seg}")
-    return "".join(found_motifs)
+                    found_motifs.append(f"{motif}{this_seg}")
+    return "".join(found_motifs) if not return_list else found_motifs
 
 
 if __name__ == "__main__":
