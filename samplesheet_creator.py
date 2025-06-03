@@ -32,13 +32,13 @@ if __name__ == "__main__":
         raise NotADirectoryError(f"Input argument does not point to a valid directory. input_dir:{args.input_dir}")
     
     if not os.path.isfile(args.ref + ".fasta"):
-        raise NotADirectoryError(f"Reference genome fasta file does not exist. ref:{args.ref + '.fasta'}")
+        raise FileNotFoundError(f"Reference genome fasta file does not exist. ref:{args.ref + '.fasta'}")
     
     if not os.path.isfile(args.host):
-        raise NotADirectoryError(f"Host genome fasta file does not exist. ref:{args.host}")
+        raise FileNotFoundError(f"Host genome fasta file does not exist. ref:{args.host}")
     
     if not os.path.isfile(args.targets + ".bed"):
-        raise NotADirectoryError(f"Targets bed file does not exist. ref:{args.targets + '.bed'}")
+        raise FileNotFoundError(f"Targets bed file does not exist. ref:{args.targets + '.bed'}")
     
     files_in_directory = os.listdir(args.input_dir)
     if not files_in_directory:
